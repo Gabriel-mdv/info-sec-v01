@@ -1,15 +1,66 @@
-<!-- Information Security Fall 2025 Lab - Dashboard Short description: Greets the
-authenticated user with the lab welcome message. -->
+{% extends "base.html" %}
 
-{% extends "base.html" %} {% block content %}
-<div class="card">
-  <h3>Dashboard</h3>
-  <p class="greeting">{{ greeting }}</p>
-  <div class="actions">
-    <a class="btn" href="{{ url_for('logout') }}">Logout</a>
-  </div>
+{% block content %}
+<div class="dashboard-wrapper">
+
+  <!-- Sidebar -->
+  <aside class="sidebar">
+    <div class="sidebar-header">
+      <h2>InfoSec Lab</h2>
+    </div>
+    <ul class="sidebar-menu">
+      <li><a href="#dashboard-main">Files</a></li>
+      
+     
+    </ul>
+  </aside>
+
+  <!-- Main content -->
+  <main class="main-content" id="dashboard-main">
+    <h3 class="greeting">{{ greeting }}</h3>
+
+    <!-- Upload Form -->
+    <section id="upload-section" class="content-section">
+      <h4>Upload a File</h4>
+      <form method="POST" action="{{ url_for('upload_file') }}" enctype="multipart/form-data">
+        <input type="file" name="file" required>
+        <button type="submit" class="btn">Upload</button>
+      </form>
+    </section>
+
+    <!-- File List -->
+    <section id="files-section" class="content-section">
+      <h4>Your Files</h4>
+      {% if files %}
+      <table class="file-table">
+        <thead>
+          <tr>
+            <th>Filename</th>
+            <th>Size (KB)</th>
+            <th>Uploaded At</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for file in files %}
+          <tr>
+            <td>{{ file.filename }}</td>
+            <td>{{ (file.size / 1024) | round(2) }}</td>
+            <td>{{ file.uploaded_at }}</td>
+            <td>
+              <a href="{{ url_for('download_file', file_id=file.id) }}" class="btn small-btn">Download</a>
+              <a href="{{ url_for('delete_file', file_id=file.id) }}" class="btn btn-danger small-btn">Delete</a>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      {% else %}
+        <p>No files uploaded yet.</p>
+      {% endif %}
+    </section>
+
+  </main>
+
 </div>
 {% endblock %}
-
-
-

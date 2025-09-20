@@ -15,6 +15,7 @@ def reset_db():
 
     # Delete all records from the users table
     cursor.execute("DELETE FROM users;")
+    cursor.execute("DELETE FROM files")
     conn.commit()
     conn.close()
 
