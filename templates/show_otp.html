@@ -1,0 +1,54 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="auth-container">
+    <h2>Current OTP Code</h2>
+    <p class="auth-subtitle">Use this code for two-factor authentication</p>
+    
+    <div class="otp-display">
+        <div class="otp-code">{{ current_otp }}</div>
+        <p class="otp-info">Valid for current minute: {{ timestamp }}</p>
+    </div>
+    
+    <div class="auth-links">
+        <a href="{{ url_for('two_factor_auth') }}" class="btn btn-primary">Enter OTP Code</a>
+    </div>
+    
+    <div class="warning">
+        <p><strong>Note:</strong> This page is for testing only. In a real system, OTPs would be displayed on a separate device or app.</p>
+    </div>
+</div>
+
+<style>
+.otp-display {
+    text-align: center;
+    margin: 2rem 0;
+    padding: 2rem;
+    background: #f5f5f5;
+    border-radius: 8px;
+}
+
+.otp-code {
+    font-size: 3rem;
+    font-weight: 800;
+    font-family: 'Courier New', monospace;
+    color: #d00;
+    margin-bottom: 1rem;
+    letter-spacing: 0.5rem;
+}
+
+.otp-info {
+    color: #666;
+    font-size: 0.9rem;
+}
+
+.warning {
+    margin-top: 2rem;
+    padding: 1rem;
+    background: #fff3cd;
+    border: 1px solid #ffeaa7;
+    border-radius: 4px;
+    color: #856404;
+}
+</style>
+{% endblock %}

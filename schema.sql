@@ -21,3 +21,12 @@ CREATE TABLE files (
     uploaded_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (user_id) REFERENCES users (id)
 );
+
+
+CREATE TABLE otp_chain (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL,
+    timestamp INTEGER NOT NULL,
+    otp TEXT NOT NULL,
+    FOREIGN KEY (user_id) REFERENCES users (id)
+)
