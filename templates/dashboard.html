@@ -1,5 +1,4 @@
 {% extends "base.html" %}
-
 {% block content %}
 <div class="dashboard-wrapper">
 
@@ -9,17 +8,18 @@
       <h2>InfoSec Lab</h2>
     </div>
     <ul class="sidebar-menu">
-      <li><a href="#dashboard-main">Files</a></li>
-      
-     
+      <li><a href="#dashboard-main" id="files-tab">Files</a></li>
+      <li><a href="#" id="users-tab">Users</a></li>
     </ul>
   </aside>
 
   <!-- Main content -->
-  <main class="main-content" id="dashboard-main">
+  <main class="main-content">
+
+    <!-- Greeting -->
     <h3 class="greeting">{{ greeting }}</h3>
 
-    <!-- Upload Form -->
+    <!-- Upload Section -->
     <section id="upload-section" class="content-section">
       <h4>Upload a File</h4>
       <form method="POST" action="{{ url_for('upload_file') }}" enctype="multipart/form-data">
@@ -28,7 +28,7 @@
       </form>
     </section>
 
-    <!-- File List -->
+    <!-- Files Section -->
     <section id="files-section" class="content-section">
       <h4>Your Files</h4>
       {% if files %}
@@ -60,7 +60,142 @@
       {% endif %}
     </section>
 
-  </main>
+    <!-- USERS SECTION -->
+    <section id="users-section" class="content-section" style="display:none;">
+      <div class="section-header">
+        <h4>Users</h4>
+        <button id="add-user-btn" class="btn small-btn">Add User</button>
+      </div>
 
+      <table class="file-table">
+        <thead>
+          <tr>
+            <th>ID</th>
+            <th>Name</th>
+            <th>Andrew ID</th>
+            <th>Role</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody id="users-table-body">
+          <!-- Dummy users for now -->
+
+      {% for u in users %}
+          <tr>
+            <td>{{ u.id }}</td>
+            <td>{{ u.name }}</td>
+            <td>{{ u.andrew_id }}</td>
+            <td>
+              {% if user.role in ['user_admin', 'data_admin'] %}
+                <select class="role-dropdown" data-user-id="{{ u.id }}">
+                  <option value="basic" {% if u.role == 'basic' %}selected{% endif %}>basic</option>
+                  <option value="user_admin" {% if u.role == 'user_admin' %}selected{% endif %}>user_admin</option>
+                  <option value="data_admin" {% if u.role == 'data_admin' %}selected{% endif %}>data_admin</option>
+                </select>
+              {% else %}
+                {{ u.role }}
+              {% endif %}
+            </td>
+            {% if user.role in ['user_admin', 'data_admin'] %}
+            <td>
+              <button class="btn btn-danger small-btn delete-user" data-user-id="{{ u.id }}">Delete</button>
+            </td>
+            {% endif %}
+          </tr>
+          {% endfor %}
+
+          <tr>
+            <td>1</td>
+            <td>Jane Doe</td>
+            <td>jdoe</td>
+            <td>
+              <select class="role-dropdown">
+                <option value="basic" selected>basic</option>
+                <option value="user_admin">user_admin</option>
+                <option value="data_admin">data_admin</option>
+              </select>
+            </td>
+            <td><button class="btn btn-danger small-btn delete-user">Delete</button></td>
+          </tr>
+          <tr>
+            <td>2</td>
+            <td>John Smith</td>
+            <td>jsmith</td>
+            <td>
+              <select class="role-dropdown">
+                <option value="basic">basic</option>
+                <option value="user_admin" selected>user_admin</option>
+                <option value="data_admin">data_admin</option>
+              </select>
+            </td>
+            <td><button class="btn btn-danger small-btn delete-user">Delete</button></td>
+          </tr>
+        </tbody>
+      </table>
+
+      <!-- Add User Form (hidden initially) -->
+      <div id="add-user-form" style="display:none; margin-top:20px;">
+        <h4>Create New User</h4>
+        <form id="new-user-form" method="POST" action="{{ url_for('create_user') }}">
+  <input type="text" name="name" placeholder="Full Name" required>
+  <input type="text" name="andrew_id" placeholder="Andrew ID" required>
+  <input type="password" name="password" placeholder="Password" required>
+  <select name="role" required>
+    <option value="basic">basic</option>
+    <option value="user_admin">user_admin</option>
+    <option value="data_admin">data_admin</option>
+  </select>
+  <button type="submit" class="btn">Create</button>
+</form>
+      </div>
+    </section>
+
+  </main>
 </div>
+
+<!-- JS for interactivity -->
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+  const usersTab = document.getElementById('users-tab');
+  const filesTab = document.getElementById('files-tab');
+  const usersSection = document.getElementById('users-section');
+  const uploadSection = document.getElementById('upload-section');
+  const filesSection = document.getElementById('files-section');
+  const addUserBtn = document.getElementById('add-user-btn');
+  const addUserForm = document.getElementById('add-user-form');
+
+  // Switch between tabs
+  usersTab.addEventListener('click', () => {
+    usersSection.style.display = 'block';
+    uploadSection.style.display = 'none';
+    filesSection.style.display = 'none';
+  });
+
+  filesTab.addEventListener('click', () => {
+    usersSection.style.display = 'none';
+    uploadSection.style.display = 'block';
+    filesSection.style.display = 'block';
+  });
+
+  // Toggle add user form
+  addUserBtn.addEventListener('click', () => {
+    addUserForm.style.display = addUserForm.style.display === 'none' ? 'block' : 'none';
+  });
+
+  // Delete user
+  document.querySelectorAll('.delete-user').forEach(btn => {
+    btn.addEventListener('click', e => {
+      e.target.closest('tr').remove();
+    });
+  });
+
+  // // Handle new user form
+  // document.getElementById('new-user-form').addEventListener('submit', e => {
+  //   e.preventDefault();
+  //   alert('User created (dummy for now)');
+  //   e.target.reset();
+  //   addUserForm.style.display = 'none';
+  // });
+});
+</script>
 {% endblock %}

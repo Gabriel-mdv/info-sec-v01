@@ -5,7 +5,7 @@ def require_2fa(view_func):
     # Decorator that ensures user is logged in and has passed 2FA.
     @wraps(view_func)
     def wrapped_view(*args, **kwargs):
-        print("[DEBUG] require_2fa check: user_id =", session.get("user_id"), " verified_2fa =", session.get("verified_2fa"))
+        # print("[DEBUG] require_2fa check: user_id =", session.get("user_id"), " verified_2fa =", session.get("verified_2fa"))
         if "user_id" not in session:
             # check if he is not even logged int to make sure and send back to login
             return redirect(url_for("login"))
