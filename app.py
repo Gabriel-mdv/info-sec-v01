@@ -70,6 +70,14 @@ def decrypt_file_data(encrypted_data):
     pad_length = padded_data[-1]
     return padded_data[:-pad_length]
 
+
+# _______ redirect ____ ____
+def redirect_to_dashboard(user):
+    if user['role'] == 'basic':
+        return redirect(url_for("dashboard"))
+    else:
+        return redirect(url_for("dash_admin"))
+
 # ---------------- Database Helpers ----------------
 def get_db():
     """Open a connection to SQLite with Row access."""
@@ -224,7 +232,7 @@ def two_factor_auth():
     
     # if alread has 2fa, go to the dashborda
     if session.get("verified_2fa"):
-        return redirect(url_for("dashboard"))
+        return redirect_to_dashboard(user)
     
     if request.method == "POST":
         entered_otp = request.form.get("otp", "").strip()
@@ -252,9 +260,10 @@ def two_factor_auth():
         # verify if 
         valid_otps = {row['otp'] for row in otps}
         # print(f"[+] Valid OTPs for user {user_id} at times {timestamps}: {valid_otps}")
+        user = current_user()
         if entered_otp in valid_otps:
             session["verified_2fa"] = True
-            return redirect(url_for("dashboard"))
+            return redirect_to_dashboard(user)
         else:
             flash("Invalid OTP. Please try again.", "error")
             return render_template("2fa.html", title="Two-Factor Authentication")
@@ -314,13 +323,13 @@ def upload_file():
     file = request.files.get("file")
     if not file or file.filename == "":
         flash("No file selected", "error")
-        return redirect(url_for("dashboard"))
+        return redirect_to_dashboard(user)
     
     # Secure the filename
     original_name = secure_filename(file.filename)
     if original_name == "":
         flash("Invalid file name.", "error")
-        return redirect(url_for("dashboard"))
+        return redirect_to_dashboard(user)
 
     try:
         # Read file data
@@ -354,7 +363,7 @@ def upload_file():
         flash(f"Upload failed: {str(e)}", "error")
         print(f"[-] Upload error: {e}")
         
-    return redirect(url_for("dashboard"))
+    return redirect_to_dashboard(user)
 
 # ---------------- Dashboard with File List ----------------
 @app.route("/dashboard")
@@ -369,6 +378,10 @@ def dashboard():
     files = conn.execute(
         "SELECT * FROM files ORDER BY uploaded_at DESC"
     ).fetchall()
+    
+    # if user is basic -> fetch only their files
+    if user["role"] not in ["data_admin"]:
+        files = [f for f in files if f["user_id"] == user["id"]]   
 
     # If admin -> fetch all users
     if user["role"] in ["user_admin", "data_admin"]:
@@ -381,15 +394,27 @@ def dashboard():
             "SELECT id, name, andrew_id, role FROM users WHERE id = ?",
             (user["id"],)
         ).fetchall()
+        
+    # fetch all logs if the user is admin
+        
+        
+        
+    
+    
+    
+    
+    
 
     conn.close()
-
+    
     greeting = f"Hello {user['name']}, Welcome to Lab 4 of Information Security course. Enjoy!!!"
     return render_template(
         "dashboard.html",
         title="Dashboard",
+        page = 1,
+        total_pages = 2,
         greeting=greeting,
-        user=user,
+        current_user=user,
         files=files,
         users=users
     )
@@ -414,7 +439,7 @@ def download_file(file_id):
 
     if not file:
         flash("File not found or not yours.", "error")
-        return redirect(url_for("dashboard"))
+        return redirect_to_dashboard(user)
     
     
     # use gurard to restrict access to download your own file except for admins
@@ -424,7 +449,7 @@ def download_file(file_id):
 
     if not can_download:
         flash("You do not have permission to download this file.", "error")
-        return redirect(url_for("dashboard"))
+        return redirect_to_dashboard(user)
 
     try:
         # Read encrypted file from disk
@@ -450,7 +475,7 @@ def download_file(file_id):
     except Exception as e:
         flash(f"Download failed: {str(e)}", "error")
         print(f"[-] Download error: {e}")
-        return redirect(url_for("dashboard"))
+        return redirect_to_dashboard(user)
 
 # ---------------- File Delete ----------------
 @app.route("/delete/<int:file_id>")
@@ -473,7 +498,7 @@ def delete_file(file_id):
     if not file:
         conn.close()
         flash("File not found or not yours.", "error")
-        return redirect(url_for("dashboard"))
+        return redirect_to_dashboard(user)
 
     # chek if is owner
     is_owner = (file['user_id'] == user['id'])
@@ -485,7 +510,7 @@ def delete_file(file_id):
     if not can_delete:
         flash("You do not have permission to delete this file.", "error")
         conn.close()
-        return redirect(url_for("dashboard"))
+        return redirect_to_dashboard(user)
     
     # Delete from disk
     try:
@@ -501,8 +526,96 @@ def delete_file(file_id):
     conn.close()
 
     flash("File deleted successfully.", "success")
-    return redirect(url_for("dashboard"))
+    return redirect_to_dashboard(user)
 
+
+# =============== AUDIT LOGS ROUTE ======================
+@app.route("/dash_admin")
+@require_2fa
+def dash_admin():
+    user = current_user()
+    
+    
+    if not user:
+        return redirect(url_for("login"))
+    
+    conn = get_db()
+    
+    
+    # other thing requiered for the dashboard
+    files = conn.execute(
+        "SELECT * FROM files ORDER BY uploaded_at DESC"
+    ).fetchall()
+    
+    # if user is basic -> fetch only their files
+    if user["role"] not in ["data_admin"]:
+        files = [f for f in files if f["user_id"] == user["id"]]   
+
+    # If admin -> fetch all users
+    if user["role"] in ["user_admin", "data_admin"]:
+        users = conn.execute(
+            "SELECT id, name, andrew_id, role FROM users ORDER BY id ASC"
+        ).fetchall()
+    else:
+        # Fetch only the current user, but keep consistent format
+        users = conn.execute(
+            "SELECT id, name, andrew_id, role FROM users WHERE id = ?",
+            (user["id"],)
+        ).fetchall()
+
+    # Permission check
+    can_view = guard.guard("read_log_file", target="audit_logs")
+    print(f"[+] Audit log access check for user {user['role']}: {can_view}")
+    if not can_view:
+        print(f"[+] Audit log access check for user {user['role']}: {can_view}")
+        flash("You do not have permission to view audit logs.", "error")
+        return redirect_to_dashboard(user)
+
+    # --- Sorting and Pagination ---
+    sort_by = request.args.get("sort_by", "created_at")
+    order = request.args.get("order", "desc")
+    page = int(request.args.get("page", 1))
+    per_page = 10
+    offset = (page - 1) * per_page
+
+    # Validate input
+    valid_sort_columns = ["created_at", "actor_andrew_id", "action", "target", "outcome"]
+    if sort_by not in valid_sort_columns:
+        sort_by = "created_at"
+    if order.lower() not in ["asc", "desc"]:
+        order = "desc"
+
+    # --- Fetch Logs ---
+
+    logs = conn.execute(
+        f"""
+        SELECT created_at, actor_andrew_id, action, target, outcome
+        FROM audit_logs
+        ORDER BY {sort_by} {order}
+        LIMIT ? OFFSET ?
+        """,
+        (per_page, offset),
+    ).fetchall()
+
+    total_logs = conn.execute("SELECT COUNT(*) FROM audit_logs").fetchone()[0]
+    conn.close()
+
+    total_pages = (total_logs + per_page - 1) // per_page
+
+    # --- Render Dashboard with active audit tab ---
+    return render_template(
+        "dashboard.html",
+        title="Audit Logs",
+        current_user=user,
+        logs=logs,
+        page=page,
+        total_pages=total_pages,
+        sort_by=sort_by,
+        order=order,
+        active_tab="audit-section",
+        files=files,
+        users=users,
+    )
 
 
 # _______________________ USERS ROUTES ___________________________
@@ -519,7 +632,7 @@ def change_password():
     can_change = guard.guard("change_password", target=user['andrew_id'])
     if not can_change:
         flash("You do not have permission to change your password.", "error")
-        return redirect(url_for("dashboard"))
+        return redirect_to_dashboard(user)
     
     current_password = request.form.get("current_password", "")
     new_password = request.form.get("new_password", "")
@@ -527,15 +640,15 @@ def change_password():
 
     if not current_password or not new_password or not confirm_password:
         flash("All password fields are required.", "error")
-        return redirect(url_for("dashboard"))
+        return redirect_to_dashboard(user)
 
     if new_password != confirm_password:
         flash("New passwords do not match.", "error")
-        return redirect(url_for("dashboard"))
+        return redirect_to_dashboard(user)
 
     if not check_password_hash(user["password"], current_password):
         flash("Current password is incorrect.", "error")
-        return redirect(url_for("dashboard"))
+        return redirect_to_dashboard(user)
 
     hashed_new_password = generate_password_hash(new_password)
 
@@ -548,7 +661,7 @@ def change_password():
     conn.close()
 
     flash("Password changed successfully.", "success")
-    return redirect(url_for("dashboard"))
+    return redirect_to_dashboard(user)
 
 # asign role to user route
 @app.route("/assign_role/<target_andrew_id>", methods=["POST"])
@@ -560,14 +673,15 @@ def assign_role(target_andrew_id):
     
     # Check permission
     can_assign = guard.guard("assign_role", target=target_andrew_id)
+    
     if not can_assign:
-        flash("You do not have permission to assign roles.", "error")
-        return redirect(url_for("dashboard"))
+        flash("Assign role denied.", "error")
+        return redirect_to_dashboard(user)
     
     new_role = request.form.get("role", "basic")
     if new_role not in ["basic", "user_admin", "data_admin"]:
         flash("Invalid role selected.", "error")
-        return redirect(url_for("dashboard"))
+        return redirect_to_dashboard(user)
 
     conn = get_db()
     target_user = conn.execute(
@@ -578,7 +692,7 @@ def assign_role(target_andrew_id):
     if not target_user:
         conn.close()
         flash("User not found.", "error")
-        return redirect(url_for("dashboard"))
+        return redirect_to_dashboard(user)
 
     conn.execute(
         "UPDATE users SET role = ? WHERE id = ?",
@@ -588,7 +702,7 @@ def assign_role(target_andrew_id):
     conn.close()
 
     flash(f"Role of user {target_andrew_id} updated to {new_role}.", "success")
-    return redirect(url_for("dashboard"))
+    return redirect_to_dashboard(user)
 
 
 # change username route 
@@ -603,12 +717,12 @@ def change_username(target_andrew_id):
     can_change = guard.guard("change_username", target=target_andrew_id)
     if not can_change:
         flash("You do not have permission to change usernames.", "error")
-        return redirect(url_for("dashboard"))
+        return redirect_to_dashboard(user)
     
     new_name = request.form.get("name", "").strip()
     if not new_name:
         flash("Name cannot be empty.", "error")
-        return redirect(url_for("dashboard"))
+        return redirect_to_dashboard(user)
 
     conn = get_db()
     target_user = conn.execute(
@@ -619,7 +733,7 @@ def change_username(target_andrew_id):
     if not target_user:
         conn.close()
         flash("User not found.", "error")
-        return redirect(url_for("dashboard"))
+        return redirect_to_dashboard(user)
 
     conn.execute(
         "UPDATE users SET name = ? WHERE id = ?",
@@ -629,7 +743,7 @@ def change_username(target_andrew_id):
     conn.close()
 
     flash(f"Name of user {target_andrew_id} updated to {new_name}.", "success")
-    return redirect(url_for("dashboard"))
+    return redirect_to_dashboard(user)
 
 
 # _______ delete user using the guard for auth ___________________________
@@ -641,10 +755,10 @@ def delete_user(target_andrew_id):
         return redirect(url_for("login"))
     
     # Check permission
-    can_delete = guard.guard("delete_user", target=target_andrew_id)
+    can_delete = guard.guard("delete_user", target=target_andrew_id, forbid_self_delete=True)
     if not can_delete:
         flash("You do not have permission to delete this user.", "error")
-        return redirect(url_for("dashboard"))
+        return redirect_to_dashboard(user)
     
     conn = get_db()
     target_user = conn.execute(
@@ -655,7 +769,7 @@ def delete_user(target_andrew_id):
     if not target_user:
         conn.close()
         flash("User not found.", "error")
-        return redirect(url_for("dashboard"))
+        return redirect_to_dashboard(user)
 
     # Delete user's files from disk
     user_files = conn.execute(
@@ -680,7 +794,7 @@ def delete_user(target_andrew_id):
     conn.close()
 
     flash(f"User {target_andrew_id} and their files have been deleted.", "success")
-    return redirect(url_for("dashboard"))
+    return redirect_to_dashboard(user)
 
 
 
@@ -697,7 +811,7 @@ def create_user():
     can_create = guard.guard("create_user", target="new_user")
     if not can_create:
         flash("You do not have permission to create users.", "error")
-        return redirect(url_for("dashboard"))
+        return redirect_to_dashboard(user)
     
     name = request.form.get("name", "").strip()
     andrew_id = request.form.get("andrew_id", "").strip().lower()
@@ -706,7 +820,7 @@ def create_user():
 
     if not name or not andrew_id or not password:
         flash("All fields are required to create a user.", "error")
-        return redirect(url_for("dashboard"))
+        return redirect_to_dashboard(user)
 
     hashed_password = generate_password_hash(password)
 
@@ -730,7 +844,7 @@ def create_user():
     finally:
         conn.close()
 
-    return redirect(url_for("dashboard"))
+    return redirect_to_dashboard(user)
 
 
 

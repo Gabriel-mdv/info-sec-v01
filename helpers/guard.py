@@ -29,31 +29,43 @@ def guard(action, target=None, forbid_self_delete=True):
     # Enforce authentication and 2FA
     user = current_user()
     if not user or not session.get("verified_2fa"):
-        log_audit(None, action, target, "denied")
+        log_audit(None, action, target, "denied") if user['role'] in [ROLE_USER_ADMIN, ROLE_DATA_ADMIN] else None
         abort(403)
 
     # Check policy
     required_role = policy.policy.get(action)
+    
     if not required_role:
-        log_audit(user['andrew_id'], action, target, "denied")
+        log_audit(user['andrew_id'], action, target, "denied") if user['role'] in [ROLE_USER_ADMIN, ROLE_DATA_ADMIN] else None
+        print ('this worked')
         return False
-
+    
+    # Special case for audit log access
+ 
+   
     # Validate user role
     # if 'role' not in user or not isinstance(user['role'], str):
     #     log_audit(user['andrew_id'], action, target, "denied")
     #     abort(500)
     has_permission = check_role_permission(user['role'], required_role)
+    
+    if action == "read_log_file" and target == "audit_logs":
+        has_permission = user['role'] in [ROLE_USER_ADMIN, ROLE_DATA_ADMIN]
 
     # Enforce self-delete protection
     if forbid_self_delete and action == "delete_user":
         user_id = str(user['id'])
         user_andrew = user['andrew_id']
         if target in [user_id, user_andrew]:
-            log_audit(user['andrew_id'], action, target, "denied")
+            log_audit(user['andrew_id'], action, target, "denied") if user['role'] in [ROLE_USER_ADMIN, ROLE_DATA_ADMIN] else None
             return False
+        
+    if action == 'assign_role' and target == user['andrew_id']:
+        log_audit(user['andrew_id'], action, target, "denied") if user['role'] in [ROLE_USER_ADMIN, ROLE_DATA_ADMIN] else None
+        return False
 
     # Log all attempts
     outcome = "allowed" if has_permission else "denied"
-    log_audit(user['andrew_id'], action, target, outcome)
+    log_audit(user['andrew_id'], action, target, outcome) if user['role'] in [ROLE_USER_ADMIN, ROLE_DATA_ADMIN] else None
 
     return has_permission

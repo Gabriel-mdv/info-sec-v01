@@ -1,43 +1,64 @@
 {% extends "base.html" %}
 {% block content %}
+
 <div class="dashboard-wrapper">
 
   <!-- Sidebar -->
-  <aside class="sidebar">
-    <div class="sidebar-header">
-      <h2>InfoSec Lab</h2>
-    </div>
+  <div class="sidebar">
+    <div class="sidebar-header">Dashboard</div>
     <ul class="sidebar-menu">
-      <li><a href="#dashboard-main" id="files-tab">Files</a></li>
-      <li><a href="#" id="users-tab">Users</a></li>
+      <li><a href="#files-section" class="active">
+       {% if current_user.role == "data_admin" %}
+          All Files
+        {% else %}
+          My Files
+        {% endif %}
+        
+      </a></li>
+      <li><a href="#upload-section">Upload Files</a></li>
+
+        <!-- manage user if role is admin and profile if role is Basic -->
+        {% if current_user.role == "user_admin" %}
+        <li><a href="#user-management">
+          Manage Users
+        </a></li>
+        {% else %}
+         
+        {% endif %}
+
+      <li><a href="#" data-bs-toggle="modal" data-bs-target="#changePasswordModal">Change Password</a></li>
+      {% if current_user.role in ["user_admin", "data_admin"] %}
+      <li><a href="#audit-section">Audit Logs</a></li>
+      {% endif %}
+
+      <li><a href="{{ url_for('logout') }}">Logout</a></li>
     </ul>
-  </aside>
+  </div>
 
   <!-- Main content -->
-  <main class="main-content">
+  <div class="main-content">
+    <div class="greeting">
+      <h2>Welcome, {{ current_user.name }}</h2>
+      <p>Andrew ID: {{ current_user.andrew_id }}</p>
+    </div>
 
-    <!-- Greeting -->
-    <h3 class="greeting">{{ greeting }}</h3>
+    <!-- Flash messages -->
+    <!-- {% with messages = get_flashed_messages(with_categories=true) %}
+      {% for category, message in messages %}
+        <div class="flash-message {{ category }}">{{ message }}</div>
+      {% endfor %}
+    {% endwith %} -->
 
-    <!-- Upload Section -->
-    <section id="upload-section" class="content-section">
-      <h4>Upload a File</h4>
-      <form method="POST" action="{{ url_for('upload_file') }}" enctype="multipart/form-data">
-        <input type="file" name="file" required>
-        <button type="submit" class="btn">Upload</button>
-      </form>
-    </section>
-
-    <!-- Files Section -->
-    <section id="files-section" class="content-section">
-      <h4>Your Files</h4>
-      {% if files %}
+    <!-- ================= FILES ================= -->
+    <div class="content-section" id="files-section">
+      <div class="section-header">
+        <h3>My Files</h3>
+      </div>
       <table class="file-table">
         <thead>
           <tr>
-            <th>Filename</th>
-            <th>Size (KB)</th>
-            <th>Uploaded At</th>
+            <th>File Name</th>
+            <th>Uploaded</th>
             <th>Actions</th>
           </tr>
         </thead>
@@ -45,26 +66,43 @@
           {% for file in files %}
           <tr>
             <td>{{ file.filename }}</td>
-            <td>{{ (file.size / 1024) | round(2) }}</td>
             <td>{{ file.uploaded_at }}</td>
             <td>
               <a href="{{ url_for('download_file', file_id=file.id) }}" class="btn small-btn">Download</a>
-              <a href="{{ url_for('delete_file', file_id=file.id) }}" class="btn btn-danger small-btn">Delete</a>
+              <a href="{{ url_for('delete_file', file_id=file.id) }}" 
+                 class="btn btn-danger small-btn"
+                >Delete</a>
             </td>
           </tr>
           {% endfor %}
         </tbody>
       </table>
-      {% else %}
-        <p>No files uploaded yet.</p>
-      {% endif %}
-    </section>
+    </div>
 
-    <!-- USERS SECTION -->
-    <section id="users-section" class="content-section" style="display:none;">
+    <!-- ================= UPLOAD ================= -->
+    <div class="content-section" id="upload-section">
       <div class="section-header">
-        <h4>Users</h4>
-        <button id="add-user-btn" class="btn small-btn">Add User</button>
+        <h3>Upload File</h3>
+      </div>
+      <form action="{{ url_for('upload_file') }}" method="POST" enctype="multipart/form-data">
+        <input type="file" name="file" required>
+        <button type="submit" class="btn">Upload</button>
+      </form>
+    </div>
+
+    <!-- ================= USER MANAGEMENT ================= -->
+    {% if current_user.role == "user_admin" %}
+     
+    <div class="content-section" id="user-management">
+      <div class="section-header">
+        <h3>Manage Users</h3>
+        
+          
+          <!-- add new user only if the current user is user_admin -->
+      
+           <button class="btn" data-bs-toggle="modal" data-bs-target="#addUserModal">+ Add User</button>
+         
+
       </div>
 
       <table class="file-table">
@@ -77,125 +115,235 @@
             <th>Actions</th>
           </tr>
         </thead>
-        <tbody id="users-table-body">
-          <!-- Dummy users for now -->
-
-      {% for u in users %}
-          <tr>
-            <td>{{ u.id }}</td>
-            <td>{{ u.name }}</td>
-            <td>{{ u.andrew_id }}</td>
+        <tbody>
+          {% for user in users %}
+          <tr data-user-id="{{ user.id }}">
+            <td>{{ user.id }}</td>
             <td>
-              {% if user.role in ['user_admin', 'data_admin'] %}
-                <select class="role-dropdown" data-user-id="{{ u.id }}">
-                  <option value="basic" {% if u.role == 'basic' %}selected{% endif %}>basic</option>
-                  <option value="user_admin" {% if u.role == 'user_admin' %}selected{% endif %}>user_admin</option>
-                  <option value="data_admin" {% if u.role == 'data_admin' %}selected{% endif %}>data_admin</option>
+              <form class="inline-edit-form" action="{{ url_for('change_username', target_andrew_id=user.andrew_id) }}" method="POST">
+                <input type="text" name="name" value="{{ user.name }}" class="inline-input">
+                <button type="submit" class="small-btn btn">Save</button>
+              </form>
+            </td>
+            <td>{{ user.andrew_id }}</td>
+            <td>
+              <form class="role-form" action="{{ url_for('assign_role', target_andrew_id=user.andrew_id) }}" method="POST">
+                <select name="role" class="role-dropdown" onchange="this.form.submit()">
+                  <option value="basic" {% if user.role == 'basic' %}selected{% endif %}>Basic</option>
+                  <option value="user_admin" {% if user.role == 'user_admin' %}selected{% endif %}>User Admin</option>
+                  <option value="data_admin" {% if user.role == 'data_admin' %}selected{% endif %}>Data Admin</option>
                 </select>
-              {% else %}
-                {{ u.role }}
-              {% endif %}
+              </form>
             </td>
-            {% if user.role in ['user_admin', 'data_admin'] %}
             <td>
-              <button class="btn btn-danger small-btn delete-user" data-user-id="{{ u.id }}">Delete</button>
+              <a href="{{ url_for('delete_user', target_andrew_id=user.andrew_id) }}" 
+                 class="btn btn-danger small-btn"
+                 onclick="return confirm('Delete user {{ user.andrew_id }} and all their files?');">
+                 Delete
+              </a>
             </td>
-            {% endif %}
           </tr>
           {% endfor %}
+        </tbody>
+      </table>
+    </div>
+      
+    {% endif %}
 
+    
+<!-- ============== AUDIT LOGS ============== -->
+    {% if current_user.role in ["user_admin", "data_admin"] %}
+
+    <div class="content-section" id="audit-section" {% if active_tab != 'audit-section' %}style="display:none;"{% endif %}>
+      <div class="section-header">
+        <h3>Audit Logs</h3>
+        <form id="sort-form" method="get" action="{{ url_for('dash_admin') }}" class="sort-controls">
+          <label>Sort by:</label>
+          <select name="sort_by" onchange="this.form.submit()">
+            <option value="created_at" {% if sort_by == 'created_at' %}selected{% endif %}>Time</option>
+            <option value="actor_andrew_id" {% if sort_by == 'actor_andrew_id' %}selected{% endif %}>Actor</option>
+            <option value="action" {% if sort_by == 'action' %}selected{% endif %}>Action</option>
+            <option value="target" {% if sort_by == 'target' %}selected{% endif %}>Target</option>
+            <option value="outcome" {% if sort_by == 'outcome' %}selected{% endif %}>Outcome</option>
+          </select>
+          <select name="order" onchange="this.form.submit()">
+            <option value="desc" {% if order == 'desc' %}selected{% endif %}>Descending</option>
+            <option value="asc" {% if order == 'asc' %}selected{% endif %}>Ascending</option>
+          </select>
+        </form>
+      </div>
+
+      <table class="file-table audit-table">
+        <thead>
           <tr>
-            <td>1</td>
-            <td>Jane Doe</td>
-            <td>jdoe</td>
-            <td>
-              <select class="role-dropdown">
-                <option value="basic" selected>basic</option>
-                <option value="user_admin">user_admin</option>
-                <option value="data_admin">data_admin</option>
-              </select>
-            </td>
-            <td><button class="btn btn-danger small-btn delete-user">Delete</button></td>
+            <th>Time (UTC)</th>
+            <th>Actor</th>
+            <th>Action</th>
+            <th>Target</th>
+            <th>Outcome</th>
           </tr>
+        </thead>
+        <tbody>
+          {% for log in logs %}
           <tr>
-            <td>2</td>
-            <td>John Smith</td>
-            <td>jsmith</td>
+            <td>{{ log.created_at }}</td>
+            <td>{{ log.actor_andrew_id }}</td>
+            <td>{{ log.action }}</td>
+            <td>{{ log.target or '-' }}</td>
             <td>
-              <select class="role-dropdown">
-                <option value="basic">basic</option>
-                <option value="user_admin" selected>user_admin</option>
-                <option value="data_admin">data_admin</option>
-              </select>
+              <span class="chip {{ log.outcome }}">{{ log.outcome|capitalize }}</span>
             </td>
-            <td><button class="btn btn-danger small-btn delete-user">Delete</button></td>
           </tr>
+          {% else %}
+          <tr><td colspan="5" style="text-align:center;">No logs available.</td></tr>
+          {% endfor %}
         </tbody>
       </table>
 
-      <!-- Add User Form (hidden initially) -->
-      <div id="add-user-form" style="display:none; margin-top:20px;">
-        <h4>Create New User</h4>
-        <form id="new-user-form" method="POST" action="{{ url_for('create_user') }}">
-  <input type="text" name="name" placeholder="Full Name" required>
-  <input type="text" name="andrew_id" placeholder="Andrew ID" required>
-  <input type="password" name="password" placeholder="Password" required>
-  <select name="role" required>
-    <option value="basic">basic</option>
-    <option value="user_admin">user_admin</option>
-    <option value="data_admin">data_admin</option>
-  </select>
-  <button type="submit" class="btn">Create</button>
-</form>
+      <div class="pagination">
+        {% if page > 1 %}
+        <a href="{{ url_for('dash_admin', page=page-1, sort_by=sort_by, order=order) }}" class="btn btn-outline">Previous</a>
+        {% endif %}
+        <span>Page {{ page }} of {{ total_pages }}</span>
+        {% if page < total_pages %}
+        <a href="{{ url_for('dash_admin', page=page+1, sort_by=sort_by, order=order) }}" class="btn btn-outline">Next</a>
+        {% endif %}
       </div>
-    </section>
 
-  </main>
+
+
+     
+    </div>
+    {% endif %}
+
+    <!-- ________ end of autidn loga  -->
+
+</div>
 </div>
 
-<!-- JS for interactivity -->
+<!-- ================= MODALS ================= -->
+<div class="modal" id="addUserModal">
+  <div class="modal-content">
+    <button class="modal-close" onclick="closeModal('addUserModal')">&times;</button>
+    <h3>Create New User</h3>
+    <form id="add-user-form" method="POST" action="{{ url_for('create_user') }}">
+      <input type="text" name="name" placeholder="Full name" required>
+      <input type="text" name="andrew_id" placeholder="Andrew ID" required>
+      <input type="password" name="password" placeholder="Password" required>
+      <select name="role">
+        <option value="basic">Basic</option>
+        <option value="user_admin">User Admin</option>
+        <option value="data_admin">Data Admin</option>
+      </select>
+      <button type="submit" class="btn">Create</button>
+    </form>
+  </div>
+</div>
+
+<div class="modal" id="changePasswordModal">
+  <div class="modal-content">
+    <button class="modal-close" onclick="closeModal('changePasswordModal')">&times;</button>
+    <h3>Change Password</h3>
+    <form action="{{ url_for('change_password') }}" method="POST">
+      <input type="password" name="current_password" placeholder="Current Password" required>
+      <input type="password" name="new_password" placeholder="New Password" required>
+      <input type="password" name="confirm_password" placeholder="Confirm New Password" required>
+      <button type="submit" class="btn">Update Password</button>
+    </form>
+  </div>
+</div>
+
 <script>
-document.addEventListener('DOMContentLoaded', () => {
-  const usersTab = document.getElementById('users-tab');
-  const filesTab = document.getElementById('files-tab');
-  const usersSection = document.getElementById('users-section');
-  const uploadSection = document.getElementById('upload-section');
-  const filesSection = document.getElementById('files-section');
-  const addUserBtn = document.getElementById('add-user-btn');
-  const addUserForm = document.getElementById('add-user-form');
 
-  // Switch between tabs
-  usersTab.addEventListener('click', () => {
-    usersSection.style.display = 'block';
-    uploadSection.style.display = 'none';
-    filesSection.style.display = 'none';
-  });
+document.addEventListener("DOMContentLoaded", () => {
+  const sections = document.querySelectorAll(".content-section");
+  const links = document.querySelectorAll(".sidebar-menu li a");
+    const flashes = document.querySelectorAll(".flash-message");
 
-  filesTab.addEventListener('click', () => {
-    usersSection.style.display = 'none';
-    uploadSection.style.display = 'block';
-    filesSection.style.display = 'block';
-  });
+  // Show only the first section by default
+  // Restore last active section from localStorage
+  const lastSection = localStorage.getItem("activeSection");
+  sections.forEach(s => s.style.display = "none");
+  const defaultSection = lastSection ? document.querySelector(lastSection) : sections[0];
+  if (defaultSection) defaultSection.style.display = "block";
 
-  // Toggle add user form
-  addUserBtn.addEventListener('click', () => {
-    addUserForm.style.display = addUserForm.style.display === 'none' ? 'block' : 'none';
-  });
+  // Sidebar navigation with memory
+  links.forEach(link => {
+    link.addEventListener("click", e => {
+      const targetId = link.getAttribute("href");
+      if (targetId.startsWith("#")) {
+        e.preventDefault();
 
-  // Delete user
-  document.querySelectorAll('.delete-user').forEach(btn => {
-    btn.addEventListener('click', e => {
-      e.target.closest('tr').remove();
+        // Hide all sections
+        sections.forEach(s => (s.style.display = "none"));
+
+        // Show target section
+        const target = document.querySelector(targetId);
+        if (target) {
+          target.style.display = "block";
+          target.scrollIntoView({ behavior: "smooth" });
+
+          // Save the last opened section
+          localStorage.setItem("activeSection", targetId);
+        }
+
+        // Highlight active link
+        links.forEach(l => l.classList.remove("active"));
+        link.classList.add("active");
+      }
     });
   });
 
-  // // Handle new user form
-  // document.getElementById('new-user-form').addEventListener('submit', e => {
-  //   e.preventDefault();
-  //   alert('User created (dummy for now)');
-  //   e.target.reset();
-  //   addUserForm.style.display = 'none';
-  // });
+
+  // Modal triggers
+  document.querySelectorAll("[data-bs-toggle='modal']").forEach(btn => {
+    btn.addEventListener("click", e => {
+      const targetId = btn.getAttribute("data-bs-target").replace("#", "");
+      openModal(targetId);
+    });
+  });
+
+
 });
+
+// ____ audit logs ____ 
+
+ const auditTab = document.querySelector("#audit-section-tab"); // or your tab button
+const auditTableBody = document.querySelector("#audit-table-body");
+
+  auditTab.addEventListener("click", async () => {
+    if (!auditTableBody.dataset.loaded) {
+      const response = await fetch("/audit_logs");
+      const html = await response.text();
+
+      // Extract just the audit logs table part from the returned HTML
+      const parser = new DOMParser();
+      const doc = parser.parseFromString(html, "text/html");
+      const newTable = doc.querySelector("#audit-table-body").innerHTML;
+
+      auditTableBody.innerHTML = newTable;
+      auditTableBody.dataset.loaded = "true";
+    }
+  });
+
+// Open and close modal
+function openModal(id) {
+  const modal = document.getElementById(id);
+  if (modal) modal.classList.add("active");
+}
+
+function closeModal(id) {
+  const modal = document.getElementById(id);
+  if (modal) modal.classList.remove("active");
+}
+
+// Close modal when clicking outside
+document.addEventListener("click", e => {
+  const modal = e.target.closest(".modal");
+  if (modal && e.target === modal) modal.classList.remove("active");
+});
+
+
 </script>
+
 {% endblock %}
