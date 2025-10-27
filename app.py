@@ -396,15 +396,6 @@ def dashboard():
         ).fetchall()
         
     # fetch all logs if the user is admin
-        
-        
-        
-    
-    
-    
-    
-    
-
     conn.close()
     
     greeting = f"Hello {user['name']}, Welcome to Lab 4 of Information Security course. Enjoy!!!"
@@ -617,7 +608,6 @@ def dash_admin():
         users=users,
     )
 
-
 # _______________________ USERS ROUTES ___________________________
 
 # change password route
@@ -796,9 +786,6 @@ def delete_user(target_andrew_id):
     flash(f"User {target_andrew_id} and their files have been deleted.", "success")
     return redirect_to_dashboard(user)
 
-
-
-
 # ____________ create user ________-- 
 @app.route("/create_user", methods=["POST"])
 @require_2fa
@@ -847,8 +834,7 @@ def create_user():
     return redirect_to_dashboard(user)
 
 
-
-# _____________--- logout ______________________
+# _____________--- logout ---______________________________
 
 @app.route("/logout")
 def logout():
@@ -856,11 +842,29 @@ def logout():
     session.clear()
     return redirect(url_for("index"))
 
+# ___________--- security hooks ---________________________
+@app.before_request
+def enforce_https_in_production():
+    if request.is_secure or request.headers.get("X-Forwarded-Proto", "http") == "https":
+        return
+    if os.environ.get("FLASK_ENV") == "production":
+        url = request.url.replace("http://", "https://", 1)
+        return redirect(url, code=301)  
+
+@app.after_request
+def set_security_headers(res):
+    res.headers["Strict-Transport-Security"] = "max-age=63072000; includeSubDomains"
+    res.headers["X-Content-Type-Options"] = "nosniff"
+    res.headers["X-Frame-Options"] = "DENY"
+    res.headers["X-XSS-Protection"] = "1; mode=block"
+    return res
+
+
 # Entrypoint for local dev
 if __name__ == "__main__":
     # Initialize database if it does not exist
     if not os.path.exists(DB_FILE):
-        print("[*] Initializing database...")
+        print("[*] Initializing database.")
         init_db()
     else:
         print("[*] Database already exists, skipping init.")
@@ -871,6 +875,19 @@ if __name__ == "__main__":
         print("[!] Please run generate_key.py first to create the AES key")
     else:
         print(f"[+] AES key found at {AES_KEY_FILE}")
+        
+        
+    cert_dir = os.path.join(BASE_DIR, "certs")
+    cert_filename = os.path.join(cert_dir, "dev-cert.pem")
+    key_filename = os.path.join(cert_dir, "dev-key.pem")
+    
+    if not os.path.exists(cert_filename) or not os.path.exists(key_filename):
+        print(f"[!] Development SSL certificates not found in {cert_dir}")
+        print("[!] Please generate self-signed certificates for HTTPS support in development")
+    else:
+        print(f"[+] Development SSL certificates found in {cert_dir}")
+    
 
     # Start Flask application
-    app.run(host="0.0.0.0", port=5000, debug=True)
+    app.run(host="0.0.0.0", port=5000, debug=True, ssl_context=(cert_filename, key_filename))
+      
